@@ -34,7 +34,6 @@ adcP16 = adc.channel(pin='P16', attn=ADC.ATTN_11DB) #Setup battery pin
 adcP15 = adc.channel(pin='P15') #Setup temperature pin
 NUM_ADC_READINGS = 50 #Number of voltage measurments
 
-#TODO format in temperature
 #Get an "average" battery measurement
 def get_parsed_battmV():
     samples_voltage = [0]*NUM_ADC_READINGS
@@ -45,6 +44,7 @@ def get_parsed_battmV():
     print("Battery mV:" + str(batt_mV))
     return int(batt_mV/100).to_bytes(2,"little")
 
+#Gets formated temperature data
 def get_parsed_temperature():
     samples_voltage = [0]*NUM_ADC_READINGS
     for i in range(50):
@@ -61,6 +61,7 @@ def get_parsed_temperature():
     degC = int(degC).to_bytes(2,"little")
     return degC
 
+#Gets and formats gps data from the module
 def get_parsed_gps_data():
     while(gps_parser.fix_stat == 0):
         print("Waiting for FIX")
@@ -119,23 +120,27 @@ x, y, z = get_parsed_accel_data()
 battmV = get_parsed_battmV()
 temperature  = get_parsed_temperature()
 
+#Crafts bytes for packet nr 1
 packetOne = format_lat_lon_speed_data(latitude, longitude, speed)
-print("Packet one: " + str(binascii.hexlify(bytearray(packetOne))))
+
+#Crafts bytes for packet nr 2
 packetTwo = format_xy_temp_data(x, y, temperature)
-print("Packet two: " + str(binascii.hexlify(bytearray(packetTwo))))
+
+#Crafts bytes for packet nr 3
 packetThree = format_z_batt_alt(z,altitude, battmV)
-print("Packet three: " + str(binascii.hexlify(bytearray(packetThree))))
+
+#Creates sigfox socket
 sigfox = Sigfox(mode=Sigfox.SIGFOX, rcz=Sigfox.RCZ1)
 sigfox_socket = socket.socket(socket.AF_SIGFOX, socket.SOCK_RAW)
 sigfox_socket.setblocking(True)
 sigfox_socket.setsockopt(socket.SOL_SIGFOX, socket.SO_RX, False)
+
+#Send packets via Sigfox
 sigfox_socket.send(packetOne)
 time.sleep(1)
 sigfox_socket.send(packetTwo)
 time.sleep(1)
 sigfox_socket.send(packetThree)
 
-pycom.rgbled(0xFF0000)
-time.sleep(5)
-pycom.rgbled(0x00FF00)
-deepsleep(600000)
+#Makes LoPy4 Go to sleep for 1 hour. When it wakes up it starts from the beggining again
+deepsleep(3600000)
